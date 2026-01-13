@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cifras – Musical</title>
+    <style>
+        :root {
+            --primary: #00d1b2;
+            --bg-dark: #121212;
+            --card-dark: #1e1e1e;
+            --text-main: #ffffff;
+            --accent: #ffdd57;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            text-align: center;
+            margin-bottom: 25px;
+            color: var(--primary);
+        }
+
+        /* Painel de Controle - Sem ser fixo agora */
+        .controls {
+            background: var(--card-dark);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            margin-bottom: 30px;
+            border: 1px solid #333;
+        }
+
+        select {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px; /* Fonte maior no seletor */
+            background: #2c2c2c;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .transpose-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+        }
+
+        button {
+            background: var(--primary);
+            color: #000;
+            border: none;
+            width: 60px;
+            height: 60px;
+            font-size: 2rem;
+            font-weight: bold;
+            border-radius: 50%; /* Botões redondos para estilo moderno */
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            transform: scale(0.9);
+            background: var(--accent);
+        }
+
+        #tomAtual {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--accent);
+            min-width: 120px;
+            text-align: center;
+            border: 2px solid #444;
+            padding: 5px 15px;
+            border-radius: 8px;
+        }
+
+        /* Área da Cifra com fonte maior */
+        pre {
+            background: var(--card-dark);
+            padding: 25px;
+            border-radius: 12px;
+            overflow-x: auto;
+            white-space: pre; 
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 1.2rem; /* Fonte aumentada para leitura fácil */
+            line-height: 1.8;
+            border: 1px solid #333;
+            color: #f0f0f0;
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            pre { font-size: 1.05rem; padding: 15px; }
+            h1 { font-size: 1.4rem; }
+            button { width: 50px; height: 50px; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-container">
+        <h1>🎵 Cifras Musical</h1>
+
+        <div class="controls">
+            <select id="musicaSelect"></select>
+            
+            <div class="transpose-row">
+                <button onclick="mudarTom(-1)">−</button>
+                <div id="tomAtual">Tom: --</div>
+                <button onclick="mudarTom(1)">+</button>
+            </div>
+        </div>
+
+        <pre id="cifra"></pre>
+    </div>
+
+    <script src="musicas.js"></script>
+
+    <script>
+        const notasSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+        const bemolParaSharp = { 'Cb': 'B', 'Db': 'C#', 'Eb': 'D#', 'Fb': 'E', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' }
+
+        let musicaAtual = 0
+        let deslocamento = 0
+
+        const select = document.getElementById('musicaSelect')
+        const cifraEl = document.getElementById('cifra')
+        const tomAtualEl = document.getElementById('tomAtual')
+
+        function carregarMusicas() {
+            if (typeof musicas !== 'undefined') {
+                musicas.forEach((m, i) => {
+                    const opt = document.createElement('option')
+                    opt.value = i
+                    opt.textContent = m.titulo
+                    select.appendChild(opt)
+                })
+                render()
+            } else {
+                cifraEl.textContent = "Erro: Arquivo musicas.js não carregado."
+            }
+        }
+
+        select.onchange = () => {
+            musicaAtual = select.value
+            deslocamento = 0
+            render()
+        }
+
+        function normalizarNota(nota) { return bemolParaSharp[nota] || nota }
+
+        function transporNota(nota, semitons) {
+            nota = normalizarNota(nota)
+            const idx = notasSharp.indexOf(nota)
+            if (idx === -1) return nota
+            return notasSharp[(idx + semitons + 12) % 12]
+        }
+
+        function transporAcorde(acorde, semitons) {
+            const regex = /^([A-G](?:#|b)?)([^\/]*)(?:\/([A-G](?:#|b)?))?$/
+            const match = acorde.match(regex)
+            if (!match) return acorde
+            const novaBase = transporNota(match[1], semitons)
+            const sufixo = match[2] || ''
+            const novoBaixo = match[3] ? transporNota(match[3], semitons) : null
+            return novoBaixo ? `${novaBase}${sufixo}/${novoBaixo}` : `${novaBase}${sufixo}`
+        }
+
+        function transporTexto(texto, semitons) {
+            return texto.replace(
+                /\b[A-G](?:#|b)?[^ \n\t\/]*(?:\/[A-G](?:#|b)?)?\b/g,
+                acorde => transporAcorde(acorde, semitons)
+            )
+        }
+
+        function mudarTom(valor) {
+            deslocamento += valor
+            render()
+        }
+
+        function render() {
+            const musica = musicas[musicaAtual]
+            cifraEl.textContent = transporTexto(musica.cifra, deslocamento)
+            const tomNormalizado = normalizarNota(musica.tom)
+            const tomBase = notasSharp.indexOf(tomNormalizado)
+            const novoTom = notasSharp[(tomBase + deslocamento + 12) % 12]
+            tomAtualEl.textContent = `Tom: ${novoTom}`
+        }
+
+        carregarMusicas()
+    </script>
+</body>
+</html>
